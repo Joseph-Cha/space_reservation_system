@@ -1,0 +1,208 @@
+.help-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.help-modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.help-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1;
+}
+
+.help-modal-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.help-modal-header .close-button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: #f3f4f6;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  transition: background-color 0.2s;
+}
+
+.help-modal-header .close-button:hover {
+  background-color: #e5e7eb;
+}
+
+.help-modal-body {
+  padding: 24px;
+}
+
+.help-section {
+  margin-bottom: 24px;
+}
+
+.help-section:last-child {
+  margin-bottom: 0;
+}
+
+.help-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #4f46e5;
+  display: inline-block;
+}
+
+.help-section p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #555;
+  margin: 0 0 8px 0;
+}
+
+.help-section ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.help-section ol li {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #555;
+}
+
+.schedule-table {
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.schedule-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.schedule-table th,
+.schedule-table td {
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+.schedule-table th {
+  background-color: #f9fafb;
+  font-weight: 600;
+  color: #333;
+}
+
+.schedule-table td {
+  color: #555;
+}
+
+.schedule-note {
+  font-size: 13px;
+  color: #666;
+  font-style: italic;
+}
+
+.contact-section {
+  background-color: #f9fafb;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.contact-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.contact-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+}
+
+.contact-value {
+  font-size: 14px;
+  color: #333;
+}
+
+.contact-email {
+  font-size: 14px;
+  color: #4f46e5;
+  text-decoration: none;
+}
+
+.contact-email:hover {
+  text-decoration: underline;
+}
+
+.help-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.confirm-button {
+  padding: 10px 24px;
+  background-color: #4f46e5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.confirm-button:hover {
+  background-color: #4338ca;
+}
+
+@media (max-width: 768px) {
+  .help-modal-content {
+    width: 95%;
+    max-height: 90vh;
+  }
+
+  .help-modal-header,
+  .help-modal-body,
+  .help-modal-footer {
+    padding: 16px;
+  }
+
+  .schedule-table td:first-child {
+    min-width: 120px;
+  }
+}
