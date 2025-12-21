@@ -269,3 +269,42 @@ Full requirements documented in `PRD.md` (Korean). Key sections:
 - Section 6: Non-functional requirements (performance, security, UX)
 - Section 9: Data model specifications
 - Section 15: Timeline estimates (9-week project)
+
+## Git Commit Guidelines
+
+**중요**: 각 작업이 완료되면 반드시 git commit을 진행해야 합니다.
+
+### Commit 규칙
+1. **작업 단위**: 하나의 기능 또는 버그 수정이 완료될 때마다 커밋
+2. **빌드 확인**: 커밋 전 `npm run build` 성공 확인
+3. **커밋 메시지 형식**:
+   ```
+   <type>: <subject>
+
+   <body>
+
+   🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+   Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+   ```
+
+### Commit Type
+- `feat`: 새로운 기능 추가
+- `fix`: 버그 수정
+- `style`: UI/스타일 변경 (기능 변경 없음)
+- `refactor`: 코드 리팩토링
+- `docs`: 문서 수정
+- `chore`: 기타 변경사항 (빌드 설정 등)
+
+### 예시
+```bash
+git add -A && git commit -m "feat: 도움말 모달 추가
+
+- 예약 시스템 이용 안내
+- 소속별 예약 오픈 일정 표시
+- 담당자 연락처 정보
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+```
