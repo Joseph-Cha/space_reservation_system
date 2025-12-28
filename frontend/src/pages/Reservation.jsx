@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { SPACES, TIME_SLOTS, DEPARTMENTS, DEPARTMENT_COLORS, formatDate, formatTimeRange, isDateBookableForDepartment, getContrastTextColors, darkenColor } from '../constants'
+import { SPACES, TIME_SLOTS, DEPARTMENTS, DEPARTMENT_COLORS, formatDate, formatTimeRange, isDateBookableForDepartment, getContrastTextColors, darkenColor, isWithinBookingWindow } from '../constants'
 import { reservationService } from '../services/reservationService'
 import { reservationsToSlots, normalizeTime } from '../utils/reservationUtils'
 import ReservationModal from '../components/ReservationModal'
@@ -25,12 +25,18 @@ function Reservation() {
       return
     }
 
+    const [year, month, day] = date.split('-').map(Number)
+    const targetDate = new Date(year, month - 1, day)
+
+    // 3개월 이내 체크 (모든 사용자에게 적용)
+    if (!isWithinBookingWindow(targetDate)) {
+      navigate('/calendar')
+      return
+    }
+
     // 관리자가 아닌 경우에만 날짜 검증
     if (user.role !== 'admin') {
       // Validate date is bookable for user's department
-      const [year, month, day] = date.split('-').map(Number)
-      const targetDate = new Date(year, month - 1, day)
-
       if (!isDateBookableForDepartment(targetDate, user.department)) {
         navigate('/calendar')
         return
@@ -295,6 +301,8 @@ function Reservation() {
               <p>예약 정보를 불러오는 중...</p>
             </div>
           ) : (
+            <>
+            <p className="scroll-hint">← 좌우로 스크롤하여 모든 장소를 확인하세요 →</p>
             <div className="table-container">
               <table className="reservation-table">
                 <thead>
@@ -384,6 +392,7 @@ function Reservation() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
       </main>

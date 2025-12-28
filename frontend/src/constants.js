@@ -231,3 +231,54 @@ export const getBookingWindowInfo = (department) => {
   const rule = rules[department] || '매월 3번째 일요일'
   return `${rule}에 다음 달 예약이 오픈됩니다`
 }
+
+// 예약 가능 최대 기간 (개월 수)
+export const MAX_BOOKING_MONTHS = 3
+
+/**
+ * 주어진 날짜가 3개월 이내인지 확인
+ * @param {Date} targetDate - 확인할 날짜
+ * @param {Date} today - 기준일 (기본값: 오늘)
+ * @returns {boolean} - 3개월 이내이면 true
+ */
+export const isWithinBookingWindow = (targetDate, today = new Date()) => {
+  const target = new Date(targetDate)
+  target.setHours(0, 0, 0, 0)
+  const now = new Date(today)
+  now.setHours(0, 0, 0, 0)
+
+  // 최대 예약 가능 날짜 계산 (3개월 후 말일)
+  const maxDate = new Date(now.getFullYear(), now.getMonth() + MAX_BOOKING_MONTHS + 1, 0)
+  maxDate.setHours(23, 59, 59, 999)
+
+  return target <= maxDate
+}
+
+/**
+ * 월 네비게이션 가능 여부 확인
+ * @param {number} year - 연도
+ * @param {number} month - 월 (0-11)
+ * @param {Date} today - 기준일 (기본값: 오늘)
+ * @returns {boolean} - 해당 월로 이동 가능하면 true
+ */
+export const canNavigateToMonth = (year, month, today = new Date()) => {
+  const now = new Date(today)
+  now.setHours(0, 0, 0, 0)
+
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth()
+
+  // 과거 월은 이동 불가
+  if (year < currentYear || (year === currentYear && month < currentMonth)) {
+    return false
+  }
+
+  // 3개월 후까지만 이동 가능
+  const maxYear = now.getFullYear()
+  const maxMonth = now.getMonth() + MAX_BOOKING_MONTHS
+
+  const targetMonths = year * 12 + month
+  const maxMonths = maxYear * 12 + maxMonth
+
+  return targetMonths <= maxMonths
+}

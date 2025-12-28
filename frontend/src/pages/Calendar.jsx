@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { isDateBookableForDepartment, getBookingWindowInfo } from '../constants'
+import { isDateBookableForDepartment, getBookingWindowInfo, canNavigateToMonth, isWithinBookingWindow, MAX_BOOKING_MONTHS } from '../constants'
 import HelpModal from '../components/HelpModal'
 import './Calendar.css'
 
@@ -57,12 +57,19 @@ function Calendar() {
   }
 
   const handlePrevMonth = () => {
-    setCurrentDate(new Date(year, month - 1))
+    if (canNavigateToMonth(year, month - 1)) {
+      setCurrentDate(new Date(year, month - 1))
+    }
   }
 
   const handleNextMonth = () => {
-    setCurrentDate(new Date(year, month + 1))
+    if (canNavigateToMonth(year, month + 1)) {
+      setCurrentDate(new Date(year, month + 1))
+    }
   }
+
+  const canGoPrev = canNavigateToMonth(year, month - 1)
+  const canGoNext = canNavigateToMonth(year, month + 1)
 
   const handleDateClick = (day) => {
     if (!day) return
@@ -70,6 +77,11 @@ function Calendar() {
     const selectedDate = new Date(year, month, day)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+
+    // 3개월 이내 체크 (모든 사용자에게 적용)
+    if (!isWithinBookingWindow(selectedDate)) {
+      return
+    }
 
     // 관리자가 아닌 경우에만 예약 가능 날짜 확인
     if (currentUser.role !== 'admin') {
@@ -96,16 +108,21 @@ function Calendar() {
   const isUnavailable = (day) => {
     if (!day) return false
 
+    const selectedDate = new Date(year, month, day)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    // 3개월 이내 체크 (모든 사용자에게 적용)
+    if (!isWithinBookingWindow(selectedDate)) {
+      return true
+    }
+
     // 관리자는 과거 날짜만 비활성화
     if (currentUser.role === 'admin') {
-      const selectedDate = new Date(year, month, day)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
       return selectedDate < today
     }
 
     // 일반 사용자는 부서별 예약 가능 날짜 확인
-    const selectedDate = new Date(year, month, day)
     return !isDateBookableForDepartment(selectedDate, currentUser.department)
   }
 
@@ -146,13 +163,21 @@ function Calendar() {
       <main className="calendar-main">
         <div className="calendar-card">
           <div className="calendar-controls">
-            <button onClick={handlePrevMonth} className="nav-button">
+            <button
+              onClick={handlePrevMonth}
+              className="nav-button"
+              disabled={!canGoPrev}
+            >
               ← 이전
             </button>
             <h2 className="calendar-title">
               {year}년 {monthNames[month]}
             </h2>
-            <button onClick={handleNextMonth} className="nav-button">
+            <button
+              onClick={handleNextMonth}
+              className="nav-button"
+              disabled={!canGoNext}
+            >
               다음 →
             </button>
           </div>
@@ -181,8 +206,8 @@ function Calendar() {
             <p>예약을 원하시는 날짜를 선택해주세요</p>
             <p className="info-note">
               * {currentUser.role === 'admin'
-                  ? '관리자는 모든 날짜에 예약이 가능합니다'
-                  : getBookingWindowInfo(currentUser.department)}
+                  ? `관리자는 ${MAX_BOOKING_MONTHS}개월 이내 모든 날짜에 예약이 가능합니다`
+                  : `${getBookingWindowInfo(currentUser.department)} (최대 ${MAX_BOOKING_MONTHS}개월)`}
             </p>
           </div>
         </div>
