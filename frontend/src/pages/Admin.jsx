@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DEPARTMENTS } from '../constants'
+import { userService } from '../services/userService'
 import './Admin.css'
 
 function Admin() {
@@ -10,6 +11,7 @@ function Admin() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [formData, setFormData] = useState({
     userId: '',
     password: '',
@@ -18,7 +20,7 @@ function Admin() {
     customDepartment: ''
   })
   const [editFormData, setEditFormData] = useState({
-    userId: '',
+    oderId: '',
     password: '',
     name: '',
     department: '',
@@ -39,9 +41,32 @@ function Admin() {
     loadUsers()
   }, [navigate])
 
-  const loadUsers = () => {
-    const allUsers = JSON.parse(localStorage.getItem('users') || '[]')
-    setUsers(allUsers)
+  const loadUsers = async () => {
+    setIsLoading(true)
+    try {
+      const { data, error } = await userService.getAllUsers()
+
+      if (error) {
+        console.error('Failed to load users:', error)
+        setUsers([])
+      } else {
+        // DB 형식을 UI 형식으로 변환
+        const formattedUsers = data.map(user => ({
+          id: user.id,
+          oderId: user.user_id,
+          name: user.name,
+          department: user.department,
+          role: user.role,
+          createdAt: user.created_at
+        }))
+        setUsers(formattedUsers)
+      }
+    } catch (err) {
+      console.error('Load users error:', err)
+      setUsers([])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const validatePassword = (password) => {
@@ -70,7 +95,7 @@ function Admin() {
     }))
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
 
     // 유효성 검증
@@ -105,37 +130,35 @@ function Admin() {
       return
     }
 
-    // 중복 확인
-    const allUsers = JSON.parse(localStorage.getItem('users') || '[]')
-    if (allUsers.find(u => u.userId === formData.userId)) {
-      setErrors({ userId: '이미 사용 중인 사용자 ID입니다' })
-      return
+    try {
+      // 최종 소속명 결정
+      const finalDepartment = formData.department === '기타'
+        ? formData.customDepartment.trim()
+        : formData.department
+
+      // Supabase에 사용자 생성
+      const { data, error } = await userService.createUser({
+        userId: formData.userId,
+        password: formData.password,
+        name: formData.name,
+        department: finalDepartment
+      })
+
+      if (error) {
+        setErrors({ userId: error.message })
+        return
+      }
+
+      // 폼 초기화 및 목록 갱신
+      setFormData({ userId: '', password: '', name: '', department: '', customDepartment: '' })
+      setShowCreateForm(false)
+      setErrors({})
+      await loadUsers()
+      alert('사용자가 성공적으로 생성되었습니다.')
+    } catch (err) {
+      console.error('Create user error:', err)
+      setErrors({ userId: '사용자 생성 중 오류가 발생했습니다.' })
     }
-
-    // 최종 소속명 결정
-    const finalDepartment = formData.department === '기타'
-      ? formData.customDepartment.trim()
-      : formData.department
-
-    // 새 사용자 생성
-    const newUser = {
-      userId: formData.userId,
-      password: formData.password,
-      name: formData.name,
-      department: finalDepartment,
-      role: 'user',
-      createdAt: new Date().toISOString()
-    }
-
-    allUsers.push(newUser)
-    localStorage.setItem('users', JSON.stringify(allUsers))
-
-    // 폼 초기화 및 목록 갱신
-    setFormData({ userId: '', password: '', name: '', department: '', customDepartment: '' })
-    setShowCreateForm(false)
-    setErrors({})
-    loadUsers()
-    alert('사용자가 성공적으로 생성되었습니다.')
   }
 
   const handleLogout = () => {
@@ -153,7 +176,7 @@ function Admin() {
     // 부서가 DEPARTMENTS에 있으면 그대로, 아니면 '기타'로 설정
     const isKnownDept = DEPARTMENTS.includes(user.department)
     setEditFormData({
-      userId: user.userId,
+      oderId: user.oderId,
       password: '',
       name: user.name,
       department: isKnownDept ? user.department : '기타',
@@ -185,7 +208,7 @@ function Admin() {
   }
 
   // 사용자 수정 제출
-  const handleEditSubmit = (e) => {
+  const handleEditSubmit = async (e) => {
     e.preventDefault()
 
     const newErrors = {}
@@ -212,32 +235,35 @@ function Admin() {
       return
     }
 
-    const finalDepartment = editFormData.department === '기타'
-      ? editFormData.customDepartment.trim()
-      : editFormData.department
+    try {
+      const finalDepartment = editFormData.department === '기타'
+        ? editFormData.customDepartment.trim()
+        : editFormData.department
 
-    const allUsers = JSON.parse(localStorage.getItem('users') || '[]')
-    const userIndex = allUsers.findIndex(u => u.userId === editingUser.userId)
-
-    if (userIndex !== -1) {
-      allUsers[userIndex] = {
-        ...allUsers[userIndex],
+      const { data, error } = await userService.updateUser(editingUser.id, {
         name: editFormData.name,
         department: finalDepartment,
-        ...(editFormData.password && { password: editFormData.password })
-      }
-      localStorage.setItem('users', JSON.stringify(allUsers))
-    }
+        password: editFormData.password || undefined
+      })
 
-    setShowEditModal(false)
-    setEditingUser(null)
-    setEditFormData({ userId: '', password: '', name: '', department: '', customDepartment: '' })
-    loadUsers()
-    alert('사용자 정보가 수정되었습니다.')
+      if (error) {
+        setEditErrors({ name: error.message })
+        return
+      }
+
+      setShowEditModal(false)
+      setEditingUser(null)
+      setEditFormData({ oderId: '', password: '', name: '', department: '', customDepartment: '' })
+      await loadUsers()
+      alert('사용자 정보가 수정되었습니다.')
+    } catch (err) {
+      console.error('Update user error:', err)
+      setEditErrors({ name: '사용자 수정 중 오류가 발생했습니다.' })
+    }
   }
 
   // 사용자 삭제
-  const handleDeleteUser = (user) => {
+  const handleDeleteUser = async (user) => {
     if (user.role === 'admin') {
       alert('관리자 계정은 삭제할 수 없습니다.')
       return
@@ -247,11 +273,20 @@ function Admin() {
       return
     }
 
-    const allUsers = JSON.parse(localStorage.getItem('users') || '[]')
-    const filteredUsers = allUsers.filter(u => u.userId !== user.userId)
-    localStorage.setItem('users', JSON.stringify(filteredUsers))
-    loadUsers()
-    alert('사용자가 삭제되었습니다.')
+    try {
+      const { error } = await userService.deleteUser(user.id)
+
+      if (error) {
+        alert('사용자 삭제 중 오류가 발생했습니다.')
+        return
+      }
+
+      await loadUsers()
+      alert('사용자가 삭제되었습니다.')
+    } catch (err) {
+      console.error('Delete user error:', err)
+      alert('사용자 삭제 중 오류가 발생했습니다.')
+    }
   }
 
   // 만료일 계산 함수
@@ -396,73 +431,79 @@ function Admin() {
 
           <div className="users-list">
             <h3>등록된 사용자 목록 ({users.length}명)</h3>
-            <div className="table-container">
-              <table className="users-table">
-                <thead>
-                  <tr>
-                    <th>사용자 ID</th>
-                    <th>담당자명</th>
-                    <th>소속</th>
-                    <th>권한</th>
-                    <th>가입일</th>
-                    <th>만료일</th>
-                    <th>상태</th>
-                    <th>작업</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map(user => {
-                    const expirationDate = getExpirationDate(user.createdAt)
-                    const expired = isExpired(user)
+            {isLoading ? (
+              <div className="loading-container">
+                <p>사용자 정보를 불러오는 중...</p>
+              </div>
+            ) : (
+              <div className="table-container">
+                <table className="users-table">
+                  <thead>
+                    <tr>
+                      <th>사용자 ID</th>
+                      <th>담당자명</th>
+                      <th>소속</th>
+                      <th>권한</th>
+                      <th>가입일</th>
+                      <th>만료일</th>
+                      <th>상태</th>
+                      <th>작업</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map(user => {
+                      const expirationDate = getExpirationDate(user.createdAt)
+                      const expired = isExpired(user)
 
-                    return (
-                      <tr key={user.userId}>
-                        <td>{user.userId}</td>
-                        <td>{user.name}</td>
-                        <td>{user.department}</td>
-                        <td>
-                          <span className={`role-badge ${user.role}`}>
-                            {user.role === 'admin' ? '관리자' : '일반'}
-                          </span>
-                        </td>
-                        <td>{new Date(user.createdAt).toLocaleDateString()}</td>
-                        <td>
-                          {user.role === 'admin'
-                            ? '-'
-                            : expirationDate.toLocaleDateString()}
-                        </td>
-                        <td>
-                          {user.role === 'admin' ? (
-                            <span className="status-badge active">-</span>
-                          ) : (
-                            <span className={`status-badge ${expired ? 'expired' : 'active'}`}>
-                              {expired ? '만료됨' : '활성'}
+                      return (
+                        <tr key={user.id}>
+                          <td>{user.oderId}</td>
+                          <td>{user.name}</td>
+                          <td>{user.department}</td>
+                          <td>
+                            <span className={`role-badge ${user.role}`}>
+                              {user.role === 'admin' ? '관리자' : '일반'}
                             </span>
-                          )}
-                        </td>
-                        <td>
-                          <div className="action-buttons">
-                            <button
-                              onClick={() => handleEditUser(user)}
-                              className="edit-button"
-                            >
-                              수정
-                            </button>
-                            <button
-                              onClick={() => handleDeleteUser(user)}
-                              className="delete-button"
-                              disabled={user.role === 'admin'}
-                            >
-                              삭제
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+                          <td>{new Date(user.createdAt).toLocaleDateString()}</td>
+                          <td>
+                            {user.role === 'admin'
+                              ? '-'
+                              : expirationDate.toLocaleDateString()}
+                          </td>
+                          <td>
+                            {user.role === 'admin' ? (
+                              <span className="status-badge active">-</span>
+                            ) : (
+                              <span className={`status-badge ${expired ? 'expired' : 'active'}`}>
+                                {expired ? '만료됨' : '활성'}
+                              </span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="action-buttons">
+                              <button
+                                onClick={() => handleEditUser(user)}
+                                className="edit-button"
+                              >
+                                수정
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(user)}
+                                className="delete-button"
+                                disabled={user.role === 'admin'}
+                              >
+                                삭제
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       </main>
@@ -482,7 +523,7 @@ function Admin() {
                 <input
                   type="text"
                   id="editUserId"
-                  value={editFormData.userId}
+                  value={editFormData.oderId}
                   readOnly
                   disabled
                   className="readonly-field"

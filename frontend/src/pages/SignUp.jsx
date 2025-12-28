@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { DEPARTMENTS } from '../constants'
+import { userService } from '../services/userService'
 import './SignUp.css'
 
 function SignUp() {
@@ -14,6 +15,7 @@ function SignUp() {
     customDepartment: ''
   })
   const [errors, setErrors] = useState({})
+  const [isLoading, setIsLoading] = useState(false)
 
   const validatePassword = (password) => {
     // 최소 8자, 영문+숫자 조합
@@ -72,7 +74,7 @@ function SignUp() {
     setErrors(newErrors)
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
 
     // 최종 유효성 검증
@@ -113,35 +115,35 @@ function SignUp() {
       return
     }
 
-    // 서버 연동 전이므로 localStorage에 저장
-    const users = JSON.parse(localStorage.getItem('users') || '[]')
+    setIsLoading(true)
 
-    // 사용자 ID 중복 확인
-    if (users.find(u => u.userId === formData.userId)) {
-      setErrors({ userId: '이미 사용 중인 사용자 ID입니다' })
-      return
+    try {
+      // 최종 소속명 결정
+      const finalDepartment = formData.department === '기타'
+        ? formData.customDepartment.trim()
+        : formData.department
+
+      // Supabase에 사용자 등록
+      const { data, error } = await userService.signUp({
+        userId: formData.userId,
+        password: formData.password,
+        name: formData.name,
+        department: finalDepartment
+      })
+
+      if (error) {
+        setErrors({ userId: error.message })
+        setIsLoading(false)
+        return
+      }
+
+      alert('회원가입이 완료되었습니다. 로그인해주세요.')
+      navigate('/login')
+    } catch (err) {
+      console.error('SignUp error:', err)
+      setErrors({ userId: '회원가입 중 오류가 발생했습니다. 다시 시도해주세요.' })
+      setIsLoading(false)
     }
-
-    // 최종 소속명 결정
-    const finalDepartment = formData.department === '기타'
-      ? formData.customDepartment.trim()
-      : formData.department
-
-    // 사용자 직접 등록
-    const newUser = {
-      userId: formData.userId,
-      password: formData.password,
-      name: formData.name,
-      department: finalDepartment,
-      role: 'user',
-      createdAt: new Date().toISOString()
-    }
-
-    users.push(newUser)
-    localStorage.setItem('users', JSON.stringify(users))
-
-    alert('회원가입이 완료되었습니다. 로그인해주세요.')
-    navigate('/login')
   }
 
   return (
@@ -161,6 +163,7 @@ function SignUp() {
               onChange={handleChange}
               placeholder="사용자 ID (최소 3자)"
               className={errors.userId ? 'error' : ''}
+              disabled={isLoading}
             />
             {errors.userId && <span className="error-message">{errors.userId}</span>}
           </div>
@@ -175,6 +178,7 @@ function SignUp() {
               onChange={handleChange}
               placeholder="최소 8자 이상, 영문+숫자"
               className={errors.password ? 'error' : ''}
+              disabled={isLoading}
             />
             {errors.password && <span className="error-message">{errors.password}</span>}
           </div>
@@ -189,6 +193,7 @@ function SignUp() {
               onChange={handleChange}
               placeholder="비밀번호를 다시 입력해주세요"
               className={errors.passwordConfirm ? 'error' : ''}
+              disabled={isLoading}
             />
             {errors.passwordConfirm && <span className="error-message">{errors.passwordConfirm}</span>}
           </div>
@@ -203,6 +208,7 @@ function SignUp() {
               onChange={handleChange}
               placeholder="홍길동"
               className={errors.name ? 'error' : ''}
+              disabled={isLoading}
             />
             {errors.name && <span className="error-message">{errors.name}</span>}
           </div>
@@ -215,6 +221,7 @@ function SignUp() {
               value={formData.department}
               onChange={handleChange}
               className={errors.department ? 'error' : ''}
+              disabled={isLoading}
             >
               <option value="">선택하세요</option>
               {DEPARTMENTS.map(dept => (
@@ -235,13 +242,14 @@ function SignUp() {
                 onChange={handleChange}
                 placeholder="소속명을 입력하세요"
                 className={errors.customDepartment ? 'error' : ''}
+                disabled={isLoading}
               />
               {errors.customDepartment && <span className="error-message">{errors.customDepartment}</span>}
             </div>
           )}
 
-          <button type="submit" className="submit-button">
-            회원가입
+          <button type="submit" className="submit-button" disabled={isLoading}>
+            {isLoading ? '가입 중...' : '회원가입'}
           </button>
         </form>
 

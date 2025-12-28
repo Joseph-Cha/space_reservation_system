@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { SPACES, TIME_SLOTS, DEPARTMENTS, DEPARTMENT_COLORS, formatDate, formatTimeRange, isDateBookableForDepartment, getContrastTextColors, darkenColor } from '../constants'
+import { reservationService } from '../services/reservationService'
+import { reservationsToSlots, normalizeTime } from '../utils/reservationUtils'
 import ReservationModal from '../components/ReservationModal'
 import './Reservation.css'
 
@@ -13,6 +15,7 @@ function Reservation() {
   const [showModal, setShowModal] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingReservation, setEditingReservation] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     // 로그인 확인
@@ -40,10 +43,25 @@ function Reservation() {
     loadReservations()
   }, [navigate, date])
 
-  const loadReservations = () => {
-    const allReservations = JSON.parse(localStorage.getItem('reservations') || '{}')
-    const dateReservations = allReservations[date] || {}
-    setReservations(dateReservations)
+  const loadReservations = async () => {
+    setIsLoading(true)
+    try {
+      const { data, error } = await reservationService.getByDate(date)
+
+      if (error) {
+        console.error('Failed to load reservations:', error)
+        setReservations({})
+      } else {
+        // DB 예약 데이터를 슬롯 형식으로 변환
+        const slots = reservationsToSlots(data)
+        setReservations(slots)
+      }
+    } catch (err) {
+      console.error('Load reservations error:', err)
+      setReservations({})
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleLogout = () => {
@@ -77,12 +95,8 @@ function Reservation() {
       const key = `${space}-${checkTime}`
       const checkReservation = reservations[key]
 
-      // Check if same reservation (match by userId, purpose, and startTime)
-      if (checkReservation &&
-          checkReservation.userId === reservation.userId &&
-          checkReservation.purpose === reservation.purpose &&
-          checkReservation.startTime === reservation.startTime) {
-
+      // Check if same reservation (match by id)
+      if (checkReservation && checkReservation.id === reservation.id) {
         if (checkReservation.isStart) {
           return { space, time: checkTime, reservation: checkReservation }
         }
@@ -102,7 +116,7 @@ function Reservation() {
 
     if (reservation) {
       // 이미 예약된 슬롯 - 수정 권한 확인
-      const canEdit = currentUser.role === 'admin' || reservation.userId === currentUser.userId
+      const canEdit = currentUser.role === 'admin' || reservation.oderId === currentUser.id
 
       if (canEdit) {
         // Find the start of this reservation
@@ -125,140 +139,94 @@ function Reservation() {
     setShowModal(true)
   }
 
-  const handleReservationSubmit = (reservationData) => {
+  const handleReservationSubmit = async (reservationData) => {
     if (isEditMode) {
-      handleUpdateReservation(reservationData)
+      await handleUpdateReservation(reservationData)
     } else {
-      handleCreateReservation(reservationData)
+      await handleCreateReservation(reservationData)
     }
   }
 
-  const handleCreateReservation = (reservationData) => {
-    const allReservations = JSON.parse(localStorage.getItem('reservations') || '{}')
-    if (!allReservations[date]) {
-      allReservations[date] = {}
-    }
-
-    // 시작 시간부터 종료 시간까지 모든 슬롯 예약
-    const startIndex = TIME_SLOTS.indexOf(selectedSlot.time)
-    const endIndex = TIME_SLOTS.indexOf(reservationData.endTime)
-
-    // 중복 예약 검사
-    const conflictingSlots = []
-    for (let i = startIndex; i < endIndex; i++) {
-      const slotKey = `${selectedSlot.space}-${TIME_SLOTS[i]}`
-      if (allReservations[date][slotKey]) {
-        conflictingSlots.push(TIME_SLOTS[i])
-      }
-    }
-
-    if (conflictingSlots.length > 0) {
-      const conflictTimes = conflictingSlots.join(', ')
-      alert(`선택한 시간대에 이미 예약이 있습니다.\n중복 시간: ${conflictTimes}`)
-      return
-    }
-
-    for (let i = startIndex; i < endIndex; i++) {
-      const slotKey = `${selectedSlot.space}-${TIME_SLOTS[i]}`
-      allReservations[date][slotKey] = {
-        ...reservationData,
-        userId: currentUser.userId,
+  const handleCreateReservation = async (reservationData) => {
+    try {
+      const { data, error } = await reservationService.create({
+        user_id: currentUser.id,
+        date: date,
         space: selectedSlot.space,
-        time: TIME_SLOTS[i],
-        isStart: i === startIndex
+        start_time: reservationData.startTime,
+        end_time: reservationData.endTime,
+        purpose: reservationData.purpose,
+        name: reservationData.name,
+        department: reservationData.department
+      })
+
+      if (error) {
+        alert(error.message)
+        return
       }
+
+      // 화면 갱신
+      await loadReservations()
+      setShowModal(false)
+      setSelectedSlot(null)
+    } catch (err) {
+      console.error('Create reservation error:', err)
+      alert('예약 생성 중 오류가 발생했습니다.')
     }
-
-    localStorage.setItem('reservations', JSON.stringify(allReservations))
-
-    // 화면 갱신
-    loadReservations()
-    setShowModal(false)
-    setSelectedSlot(null)
   }
 
-  const handleUpdateReservation = (reservationData) => {
-    const allReservations = JSON.parse(localStorage.getItem('reservations') || '{}')
-
-    // 기존 예약의 슬롯 키들 수집 (충돌 검사에서 제외)
-    const oldSlotKeys = new Set()
-    const oldStartIndex = TIME_SLOTS.indexOf(editingReservation.startTime)
-    const oldEndIndex = TIME_SLOTS.indexOf(editingReservation.endTime)
-    for (let i = oldStartIndex; i < oldEndIndex; i++) {
-      oldSlotKeys.add(`${selectedSlot.space}-${TIME_SLOTS[i]}`)
-    }
-
-    // 새 예약 범위 계산
-    const newStartIndex = TIME_SLOTS.indexOf(reservationData.startTime)
-    const newEndIndex = TIME_SLOTS.indexOf(reservationData.endTime)
-
-    // 중복 예약 검사 (기존 예약 슬롯 제외)
-    const conflictingSlots = []
-    for (let i = newStartIndex; i < newEndIndex; i++) {
-      const slotKey = `${selectedSlot.space}-${TIME_SLOTS[i]}`
-      // 기존 예약의 슬롯이 아닌 곳에 이미 예약이 있으면 충돌
-      if (!oldSlotKeys.has(slotKey) && allReservations[date][slotKey]) {
-        conflictingSlots.push(TIME_SLOTS[i])
-      }
-    }
-
-    if (conflictingSlots.length > 0) {
-      const conflictTimes = conflictingSlots.join(', ')
-      alert(`선택한 시간대에 이미 예약이 있습니다.\n중복 시간: ${conflictTimes}`)
-      return
-    }
-
-    // 기존 예약 삭제
-    for (let i = oldStartIndex; i < oldEndIndex; i++) {
-      const slotKey = `${selectedSlot.space}-${TIME_SLOTS[i]}`
-      delete allReservations[date][slotKey]
-    }
-
-    // 새 예약 추가
-    for (let i = newStartIndex; i < newEndIndex; i++) {
-      const slotKey = `${selectedSlot.space}-${TIME_SLOTS[i]}`
-      allReservations[date][slotKey] = {
-        ...reservationData,
-        userId: editingReservation.userId,
+  const handleUpdateReservation = async (reservationData) => {
+    try {
+      const { data, error } = await reservationService.update(editingReservation.id, {
+        date: date,
         space: selectedSlot.space,
-        time: TIME_SLOTS[i],
-        isStart: i === newStartIndex
+        start_time: reservationData.startTime,
+        end_time: reservationData.endTime,
+        purpose: reservationData.purpose,
+        name: reservationData.name,
+        department: reservationData.department
+      })
+
+      if (error) {
+        alert(error.message)
+        return
       }
+
+      // 화면 갱신
+      await loadReservations()
+      setShowModal(false)
+      setSelectedSlot(null)
+      setIsEditMode(false)
+      setEditingReservation(null)
+    } catch (err) {
+      console.error('Update reservation error:', err)
+      alert('예약 수정 중 오류가 발생했습니다.')
     }
-
-    localStorage.setItem('reservations', JSON.stringify(allReservations))
-
-    // 화면 갱신
-    loadReservations()
-    setShowModal(false)
-    setSelectedSlot(null)
-    setIsEditMode(false)
-    setEditingReservation(null)
   }
 
-  const handleDeleteReservation = () => {
+  const handleDeleteReservation = async () => {
     if (!window.confirm('정말로 이 예약을 삭제하시겠습니까?')) {
       return
     }
 
-    const allReservations = JSON.parse(localStorage.getItem('reservations') || '{}')
+    try {
+      const { error } = await reservationService.delete(editingReservation.id)
 
-    // 예약 슬롯 삭제
-    const startIndex = TIME_SLOTS.indexOf(editingReservation.startTime)
-    const endIndex = TIME_SLOTS.indexOf(editingReservation.endTime)
-    for (let i = startIndex; i < endIndex; i++) {
-      const slotKey = `${selectedSlot.space}-${TIME_SLOTS[i]}`
-      delete allReservations[date][slotKey]
+      if (error) {
+        alert('예약 삭제 중 오류가 발생했습니다.')
+        return
+      }
+
+      // 화면 갱신
+      await loadReservations()
+      setShowModal(false)
+      setSelectedSlot(null)
+      setIsEditMode(false)
+      setEditingReservation(null)
+    } catch (err) {
+      console.error('Delete reservation error:', err)
+      alert('예약 삭제 중 오류가 발생했습니다.')
     }
-
-    localStorage.setItem('reservations', JSON.stringify(allReservations))
-
-    // 화면 갱신
-    loadReservations()
-    setShowModal(false)
-    setSelectedSlot(null)
-    setIsEditMode(false)
-    setEditingReservation(null)
   }
 
   const isSlotReserved = (space, time) => {
@@ -322,95 +290,101 @@ function Reservation() {
             <h2 className="date-title">{formatDate(date)}</h2>
           </div>
 
-          <div className="table-container">
-            <table className="reservation-table">
-              <thead>
-                <tr>
-                  <th className="time-header">시간 / 장소</th>
-                  {SPACES.map(space => (
-                    <th key={space}>
-                      {space.startsWith('Vision Factory')
-                        ? <>Vision<br/>Factory {space.split(' ')[2]}</>
-                        : space}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {TIME_SLOTS.map(time => (
-                  <tr key={time}>
-                    <td className="time-cell">{formatTimeRange(time)}</td>
-                    {SPACES.map(space => {
-                      const isReserved = isSlotReserved(space, time)
-                      const reservationInfo = getReservationInfo(space, time)
-
-                      // 연속 예약 블록의 시작/끝 여부 확인
-                      const currentTimeIndex = TIME_SLOTS.indexOf(time)
-                      const nextTime = TIME_SLOTS[currentTimeIndex + 1]
-                      const isFirst = reservationInfo?.isStart
-                      const isLast = reservationInfo && nextTime === reservationInfo.endTime
-
-                      // 테두리 스타일 계산 (외곽에만 테두리)
-                      const getBorderStyle = () => {
-                        if (!isReserved || !reservationInfo) return {}
-                        const borderColor = darkenColor(DEPARTMENT_COLORS[reservationInfo.department] || '#B19CD9', 30)
-                        return {
-                          backgroundColor: DEPARTMENT_COLORS[reservationInfo.department] || '#B19CD9',
-                          borderLeft: `2px solid ${borderColor}`,
-                          borderRight: `2px solid ${borderColor}`,
-                          borderTop: isFirst ? `2px solid ${borderColor}` : 'none',
-                          borderBottom: isLast ? `2px solid ${borderColor}` : 'none'
-                        }
-                      }
-
-                      return (
-                        <td
-                          key={`${space}-${time}`}
-                          className={`slot-cell ${isReserved ? 'reserved' : 'available'} ${
-                            isReserved && reservationInfo && (currentUser.role === 'admin' || reservationInfo.userId === currentUser.userId) ? 'editable' : ''
-                          }`}
-                          style={getBorderStyle()}
-                          onClick={() => handleSlotClick(space, time)}
-                        >
-                          {isReserved && reservationInfo && (() => {
-                            const bgColor = DEPARTMENT_COLORS[reservationInfo.department] || '#B19CD9'
-                            const textColors = getContrastTextColors(bgColor)
-
-                            return (
-                              <div className="reservation-info">
-                                {reservationInfo.isStart && (
-                                  <>
-                                    <div
-                                      className="reservation-name"
-                                      style={{ color: textColors.primary }}
-                                    >
-                                      {reservationInfo.name}
-                                    </div>
-                                    <div
-                                      className="reservation-purpose"
-                                      style={{ color: textColors.secondary }}
-                                    >
-                                      {reservationInfo.purpose}
-                                    </div>
-                                    <div
-                                      className="reservation-time"
-                                      style={{ color: textColors.tertiary }}
-                                    >
-                                      {reservationInfo.startTime} - {reservationInfo.endTime}
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            )
-                          })()}
-                        </td>
-                      )
-                    })}
+          {isLoading ? (
+            <div className="loading-container">
+              <p>예약 정보를 불러오는 중...</p>
+            </div>
+          ) : (
+            <div className="table-container">
+              <table className="reservation-table">
+                <thead>
+                  <tr>
+                    <th className="time-header">시간 / 장소</th>
+                    {SPACES.map(space => (
+                      <th key={space}>
+                        {space.startsWith('Vision Factory')
+                          ? <>Vision<br/>Factory {space.split(' ')[2]}</>
+                          : space}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {TIME_SLOTS.map(time => (
+                    <tr key={time}>
+                      <td className="time-cell">{formatTimeRange(time)}</td>
+                      {SPACES.map(space => {
+                        const isReserved = isSlotReserved(space, time)
+                        const reservationInfo = getReservationInfo(space, time)
+
+                        // 연속 예약 블록의 시작/끝 여부 확인
+                        const currentTimeIndex = TIME_SLOTS.indexOf(time)
+                        const nextTime = TIME_SLOTS[currentTimeIndex + 1]
+                        const isFirst = reservationInfo?.isStart
+                        const isLast = reservationInfo && nextTime === reservationInfo.endTime
+
+                        // 테두리 스타일 계산 (외곽에만 테두리)
+                        const getBorderStyle = () => {
+                          if (!isReserved || !reservationInfo) return {}
+                          const borderColor = darkenColor(DEPARTMENT_COLORS[reservationInfo.department] || '#B19CD9', 30)
+                          return {
+                            backgroundColor: DEPARTMENT_COLORS[reservationInfo.department] || '#B19CD9',
+                            borderLeft: `2px solid ${borderColor}`,
+                            borderRight: `2px solid ${borderColor}`,
+                            borderTop: isFirst ? `2px solid ${borderColor}` : 'none',
+                            borderBottom: isLast ? `2px solid ${borderColor}` : 'none'
+                          }
+                        }
+
+                        return (
+                          <td
+                            key={`${space}-${time}`}
+                            className={`slot-cell ${isReserved ? 'reserved' : 'available'} ${
+                              isReserved && reservationInfo && (currentUser.role === 'admin' || reservationInfo.oderId === currentUser.id) ? 'editable' : ''
+                            }`}
+                            style={getBorderStyle()}
+                            onClick={() => handleSlotClick(space, time)}
+                          >
+                            {isReserved && reservationInfo && (() => {
+                              const bgColor = DEPARTMENT_COLORS[reservationInfo.department] || '#B19CD9'
+                              const textColors = getContrastTextColors(bgColor)
+
+                              return (
+                                <div className="reservation-info">
+                                  {reservationInfo.isStart && (
+                                    <>
+                                      <div
+                                        className="reservation-name"
+                                        style={{ color: textColors.primary }}
+                                      >
+                                        {reservationInfo.name}
+                                      </div>
+                                      <div
+                                        className="reservation-purpose"
+                                        style={{ color: textColors.secondary }}
+                                      >
+                                        {reservationInfo.purpose}
+                                      </div>
+                                      <div
+                                        className="reservation-time"
+                                        style={{ color: textColors.tertiary }}
+                                      >
+                                        {reservationInfo.startTime} - {reservationInfo.endTime}
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              )
+                            })()}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </main>
 
