@@ -13,7 +13,11 @@ export const reservationsToSlots = (reservations) => {
     const endTime = reservation.end_time.substring(0, 5)
 
     const startIdx = TIME_SLOTS.indexOf(startTime)
-    const endIdx = TIME_SLOTS.indexOf(endTime)
+    // 종료 시간이 22:00인 경우 TIME_SLOTS에 없으므로 특별 처리
+    let endIdx = TIME_SLOTS.indexOf(endTime)
+    if (endIdx === -1 && endTime === '22:00') {
+      endIdx = TIME_SLOTS.length // 마지막 슬롯까지 포함
+    }
 
     // 유효하지 않은 시간인 경우 스킵
     if (startIdx === -1 || endIdx === -1) {

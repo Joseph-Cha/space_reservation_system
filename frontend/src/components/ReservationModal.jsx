@@ -37,16 +37,18 @@ function ReservationModal({ space, date, time, currentUser, isEditMode, editingR
         isProvisional: editingReservation.isProvisional || false
       })
     } else {
-      // 생성 모드: 기본 종료 시간 설정 (시작 시간 + 30분)
+      // 생성 모드: formData 완전 초기화 (이전 데이터 잔류 방지)
       const startIndex = TIME_SLOTS.indexOf(time)
-      if (startIndex < TIME_SLOTS.length - 1) {
-        setFormData(prev => ({
-          ...prev,
-          endTime: TIME_SLOTS[startIndex + 1]
-        }))
-      }
+      setFormData({
+        name: currentUser.name || '',
+        department: currentUser.department || '',
+        purpose: '', // 목적 초기화
+        startTime: time,
+        endTime: startIndex < TIME_SLOTS.length - 1 ? TIME_SLOTS[startIndex + 1] : '',
+        isProvisional: false
+      })
     }
-  }, [time, isEditMode, editingReservation])
+  }, [time, isEditMode, editingReservation, currentUser])
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
