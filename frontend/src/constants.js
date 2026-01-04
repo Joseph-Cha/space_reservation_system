@@ -19,6 +19,9 @@ for (let hour = 7; hour < 22; hour++) {
   TIME_SLOTS.push(`${String(hour).padStart(2, '0')}:30`)
 }
 
+// 종료 시간용 슬롯 (07:30 ~ 22:00)
+export const END_TIME_SLOTS = [...TIME_SLOTS.slice(1), '22:00']
+
 // 소속/부서 목록
 export const DEPARTMENTS = [
   '교역자',

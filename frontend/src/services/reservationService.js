@@ -70,6 +70,19 @@ export const reservationService = {
       .select()
       .single()
 
+    // DB 에러를 사용자 친화적인 메시지로 변환
+    if (error) {
+      if (error.code === '23505' || error.message?.includes('duplicate key') || error.message?.includes('unique_reservation')) {
+        return {
+          data: null,
+          error: {
+            message: '해당 시간대에 이미 다른 예약이 존재합니다. 다른 시간대를 선택해주세요.'
+          }
+        }
+      }
+      return { data: null, error: { message: '예약 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' } }
+    }
+
     return { data, error }
   },
 
@@ -139,16 +152,23 @@ export const reservationService = {
       return { hasConflict: false, conflictingTimes: [] }
     }
 
+    // 시간을 HH:MM 형식으로 정규화하는 함수
+    const normalizeTime = (time) => {
+      if (!time) return ''
+      return time.substring(0, 5) // "HH:MM:SS" -> "HH:MM"
+    }
+
     // 시간 겹침 검사
     const conflictingTimes = []
-    const newStart = startTime
-    const newEnd = endTime
+    const newStart = normalizeTime(startTime)
+    const newEnd = normalizeTime(endTime)
 
     data.forEach(reservation => {
-      const existStart = reservation.start_time
-      const existEnd = reservation.end_time
+      const existStart = normalizeTime(reservation.start_time)
+      const existEnd = normalizeTime(reservation.end_time)
 
       // 시간이 겹치는 경우: (newStart < existEnd) AND (newEnd > existStart)
+      // 경계값은 겹치지 않음 (13:00 끝나는 예약과 13:00 시작하는 예약은 OK)
       if (newStart < existEnd && newEnd > existStart) {
         conflictingTimes.push(`${existStart} ~ ${existEnd}`)
       }

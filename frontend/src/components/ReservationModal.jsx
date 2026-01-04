@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { TIME_SLOTS, DEPARTMENTS, formatDate } from '../constants'
+import { TIME_SLOTS, END_TIME_SLOTS, DEPARTMENTS, formatDate } from '../constants'
 import './ReservationModal.css'
 
 function ReservationModal({ space, date, time, currentUser, isEditMode, editingReservation, onClose, onSubmit, onDelete }) {
@@ -83,10 +83,8 @@ function ReservationModal({ space, date, time, currentUser, isEditMode, editingR
     }
 
     if (formData.startTime && formData.endTime) {
-      const startIndex = TIME_SLOTS.indexOf(formData.startTime)
-      const endIndex = TIME_SLOTS.indexOf(formData.endTime)
-
-      if (startIndex >= endIndex) {
+      // 시간 문자열 비교 (HH:MM 형식이므로 문자열 비교 가능)
+      if (formData.startTime >= formData.endTime) {
         newErrors.endTime = '종료 시간은 시작 시간보다 이후여야 합니다'
       }
     }
@@ -100,10 +98,12 @@ function ReservationModal({ space, date, time, currentUser, isEditMode, editingR
   }
 
 
-  // 시작 시간 이후의 시간만 선택 가능하도록 필터링
+  // 시작 시간 이후의 시간만 선택 가능하도록 필터링 (22:00 포함)
   const getAvailableEndTimes = () => {
     const startIndex = TIME_SLOTS.indexOf(formData.startTime)
-    return TIME_SLOTS.filter((_, index) => index > startIndex)
+    // END_TIME_SLOTS는 TIME_SLOTS.slice(1) + '22:00' 이므로
+    // startIndex에 해당하는 END_TIME_SLOTS 이후의 시간만 반환
+    return END_TIME_SLOTS.filter((_, index) => index >= startIndex)
   }
 
   return (
