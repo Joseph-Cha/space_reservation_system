@@ -34,6 +34,7 @@ export const reservationsToSlots = (reservations) => {
         space: reservation.space,
         time: TIME_SLOTS[i],
         isStart: i === startIdx,
+        isProvisional: reservation.is_provisional || false,
         // 원본 데이터도 보존
         _original: reservation
       }
@@ -124,7 +125,8 @@ export const formatReservationForUI = (reservation) => {
     endTime: normalizeTime(reservation.end_time),
     space: reservation.space,
     date: reservation.date,
-    createdAt: reservation.created_at
+    createdAt: reservation.created_at,
+    isProvisional: reservation.is_provisional || false
   }
 }
 
@@ -145,6 +147,7 @@ export const formatReservationForDB = (uiData, oderId, date, space) => {
     end_time: uiData.endTime,
     purpose: uiData.purpose,
     name: uiData.name,
-    department: uiData.department
+    department: uiData.department,
+    is_provisional: uiData.isProvisional || false
   }
 }

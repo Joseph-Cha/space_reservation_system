@@ -236,6 +236,25 @@
   background-color: #fef2f2;
 }
 
+.legend-box.provisional {
+  background-color: #fef3c7;
+  border: 2px dashed #f59e0b;
+}
+
+.legend-provisional {
+  margin-left: 8px;
+  padding-left: 16px;
+  border-left: 1px solid #e5e7eb;
+}
+
+/* 가예약 배지 */
+.provisional-badge {
+  display: inline;
+  color: inherit;
+  font-weight: 700;
+  margin-right: 2px;
+}
+
 .admin-button {
   padding: 8px 16px;
   background-color: #4f46e5;

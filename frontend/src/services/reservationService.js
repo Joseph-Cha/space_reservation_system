@@ -64,7 +64,8 @@ export const reservationService = {
         end_time: reservationData.end_time,
         purpose: reservationData.purpose,
         name: reservationData.name,
-        department: reservationData.department
+        department: reservationData.department,
+        is_provisional: reservationData.is_provisional || false
       })
       .select()
       .single()
@@ -100,6 +101,7 @@ export const reservationService = {
         purpose: reservationData.purpose,
         name: reservationData.name,
         department: reservationData.department,
+        is_provisional: reservationData.is_provisional || false,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)

@@ -163,7 +163,8 @@ function Reservation() {
         end_time: reservationData.endTime,
         purpose: reservationData.purpose,
         name: reservationData.name,
-        department: reservationData.department
+        department: reservationData.department,
+        is_provisional: reservationData.isProvisional || false
       })
 
       if (error) {
@@ -190,7 +191,8 @@ function Reservation() {
         end_time: reservationData.endTime,
         purpose: reservationData.purpose,
         name: reservationData.name,
-        department: reservationData.department
+        department: reservationData.department,
+        is_provisional: reservationData.isProvisional || false
       })
 
       if (error) {
@@ -284,6 +286,10 @@ function Reservation() {
               <span>{dept}</span>
             </div>
           ))}
+          <div className="legend-item legend-provisional">
+            <span className="legend-box provisional"></span>
+            <span>가예약 (점선)</span>
+          </div>
         </div>
       </header>
 
@@ -331,16 +337,17 @@ function Reservation() {
                         const isFirst = reservationInfo?.isStart
                         const isLast = reservationInfo && nextTime === reservationInfo.endTime
 
-                        // 테두리 스타일 계산 (외곽에만 테두리)
+                        // 테두리 스타일 계산 (외곽에만 테두리, 가예약은 점선)
                         const getBorderStyle = () => {
                           if (!isReserved || !reservationInfo) return {}
                           const borderColor = darkenColor(DEPARTMENT_COLORS[reservationInfo.department] || '#B19CD9', 30)
+                          const borderStyle = reservationInfo.isProvisional ? 'dashed' : 'solid'
                           return {
                             backgroundColor: DEPARTMENT_COLORS[reservationInfo.department] || '#B19CD9',
-                            borderLeft: `2px solid ${borderColor}`,
-                            borderRight: `2px solid ${borderColor}`,
-                            borderTop: isFirst ? `2px solid ${borderColor}` : 'none',
-                            borderBottom: isLast ? `2px solid ${borderColor}` : 'none'
+                            borderLeft: `2px ${borderStyle} ${borderColor}`,
+                            borderRight: `2px ${borderStyle} ${borderColor}`,
+                            borderTop: isFirst ? `2px ${borderStyle} ${borderColor}` : 'none',
+                            borderBottom: isLast ? `2px ${borderStyle} ${borderColor}` : 'none'
                           }
                         }
 
@@ -365,6 +372,7 @@ function Reservation() {
                                         className="reservation-name"
                                         style={{ color: textColors.primary }}
                                       >
+                                        {reservationInfo.isProvisional && <span className="provisional-badge">[가]</span>}
                                         {reservationInfo.name}
                                       </div>
                                       <div

@@ -8,7 +8,8 @@ function ReservationModal({ space, date, time, currentUser, isEditMode, editingR
     department: currentUser.department || '',
     purpose: '',
     startTime: time,
-    endTime: ''
+    endTime: '',
+    isProvisional: false
   })
   const [errors, setErrors] = useState({})
 
@@ -32,7 +33,8 @@ function ReservationModal({ space, date, time, currentUser, isEditMode, editingR
         department: editingReservation.department,
         purpose: editingReservation.purpose,
         startTime: editingReservation.startTime,
-        endTime: editingReservation.endTime
+        endTime: editingReservation.endTime,
+        isProvisional: editingReservation.isProvisional || false
       })
     } else {
       // 생성 모드: 기본 종료 시간 설정 (시작 시간 + 30분)
@@ -47,10 +49,10 @@ function ReservationModal({ space, date, time, currentUser, isEditMode, editingR
   }, [time, isEditMode, editingReservation])
 
   const handleChange = (e) => {
-    const { name, value } = e.target
+    const { name, value, type, checked } = e.target
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }))
     setErrors(prev => ({
       ...prev,
@@ -204,6 +206,27 @@ function ReservationModal({ space, date, time, currentUser, isEditMode, editingR
               </select>
               {errors.endTime && <span className="error-message">{errors.endTime}</span>}
             </div>
+          </div>
+
+          <div className="form-group provisional-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                name="isProvisional"
+                checked={formData.isProvisional}
+                onChange={handleChange}
+              />
+              <span className="checkbox-text">가예약으로 등록</span>
+            </label>
+            {formData.isProvisional && (
+              <div className="provisional-notice">
+                <span className="notice-icon">ℹ️</span>
+                <span className="notice-text">
+                  가예약은 확정된 예약이 아닙니다. 해당 장소에 대해 각 선교회의 연락을 통해
+                  예약이 변경될 수 있습니다.
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="modal-actions">
